@@ -1,0 +1,126 @@
+syntax = "proto3";
+
+package Server;
+
+// 请求消息格式
+message ServerRequest {
+  string message = 1;
+}
+
+message IndexRequest {
+    repeated string indices = 1; // 输入的索引列表
+}
+
+// 响应消息格式
+
+message ServerResponse {
+  string message = 1;
+}
+
+message HashResponse {
+    message HashPair {
+        string hash = 1;
+        string original_index = 2;
+    }
+
+    repeated HashPair hash_pairs = 1; // 键值对列表
+    repeated string hash_keys = 2; // 哈希后的键集合
+}
+
+message MessageRequest {
+  string json_data = 1;  // 客户端发送的 JSON 数据（作为字符串）
+}
+
+message MessageResponse {
+  string json_data = 1;  // 服务器返回的 JSON 数据（作为字符串）
+}
+
+message Empty {}
+
+// 请求消息格式，包含两个序列化后的Pandas Series JSON字符串
+message SeriesRequest {
+    string series_grad = 1;
+    string series_hess = 2;
+}
+
+// 响应消息格式，包含两个序列化后的Pandas Series JSON字符串
+message SeriesResponse {
+    string series_grad = 1;
+    string series_hess = 2;
+}
+
+message DISeriesResponse {
+    string series_grad = 1;
+    string series_hess = 2;
+    string key_list = 3;
+}
+
+message PublicKey {
+    bytes n = 1;  // 公钥的 n 值（大整数）
+}
+
+message PrivateKey {
+    bytes p = 1;  // 私钥的 p 值（大整数）
+    bytes q = 2;  // 私钥的 q 值（大整数）
+}
+
+
+// SplitData消息格式，用于表示单个分割的数据
+message SplitData {
+  string grad_left = 1; // 加密后的grad_left
+  string hess_left = 2; // 加密后的hess_left
+}
+
+// SplitsRequest消息格式，包含多个SplitData
+message SplitsRequest {
+  repeated SplitData splits_data = 1;
+}
+
+// DecryptedSplitInfo消息格式，表示解密后的分割信息
+message DecryptedSplitInfo {
+  int32 idx = 1; // 索引
+  double grad = 2; // 解密后的grad值
+  double hess = 3; // 解密后的hess值
+}
+
+// SplitsResponse消息格式，包含多个DecryptedSplitInfo
+message SplitsResponse {
+  repeated DecryptedSplitInfo decrypted_splits_data = 1;
+}
+
+// 传输文件
+message FileRequest {
+  message FileInfo {
+    bytes file = 1; // 文件内容
+    string name = 2; // 文件名
+    string party_name = 3; // 发送方名字
+  }
+
+  repeated FileInfo files = 1; // 支持多个文件
+}
+
+message FileReply {
+  string msg = 1; // 响应消息
+}
+
+
+// 服务定义
+service Server {
+  rpc ACallP_sample_align (ServerRequest) returns (ServerResponse);
+  rpc ComputeHash (IndexRequest) returns (HashResponse);
+  rpc ASendMessage (MessageRequest) returns (Empty);
+  rpc PSendMessage (MessageRequest) returns (Empty);
+  rpc AWaitForMessage (Empty) returns (MessageResponse);
+  rpc PWaitForMessage (Empty) returns (MessageResponse);
+  rpc BQBoost (SeriesRequest) returns (SeriesResponse);
+  rpc DIBoost (SeriesRequest) returns (DISeriesResponse);
+  rpc LoadEncryptedNumber (SeriesRequest) returns (SeriesRequest);
+  rpc GetPublicKey (Empty) returns (PublicKey);
+  rpc GetPrivateKey (Empty) returns (PrivateKey);
+  rpc GetDecryptedSplits (SplitsRequest) returns (SplitsResponse);
+  rpc DecryptGradientHessian (SeriesRequest) returns (SeriesResponse);
+  rpc PSendFile(FileRequest) returns (Empty);
+  rpc AGetFile(Empty) returns (FileRequest);
+  rpc ASendFile(FileRequest) returns (Empty);
+  rpc PGetFile(Empty) returns (FileRequest);
+}
