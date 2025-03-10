@@ -330,10 +330,16 @@ class ActiveParty:
         # self.broadcast_pub_key() 不需要广播公钥
         self.sample_align()
         while self.train_status():  # 树没建完
+            stub=stub_list[0]
+
             spliting_node = self.split_nodes.popleft()
             # 检查叶子节点能否继续分裂（到达深度 / 样本过少都会停止分裂）
             if not spliting_node.splitable():
                 continue
+
+            #告诉被动方继续建树
+            stub.ASendMessage(Server_pb2.MessageRequest(json_data="3")) #3代表继续建树
+
             logger.info(f'{self.name.upper()}: Splitting node {spliting_node.id}. ')
 
             # 准备好本节点训练所用的文件
@@ -343,7 +349,6 @@ class ActiveParty:
                 json.dump(instance_space, f)        
 
             # 向被动方发送梯度信息
-            stub=stub_list[0]
             data = msg_gradient_file(self.name, instance_space_file, self.model.grad_file, self.model.hess_file)
 
             #获取存储梯度信息的文件：data['instance_space'],data['grad'],data['hess']
@@ -388,8 +393,8 @@ class ActiveParty:
                 global_splits = ("party-1", passive_best_split[0], passive_best_split[1])
 
 
-            logger.info(
-                f'{self.name.upper()}: Global best split point confirmed, belongs to {global_splits[0]} with gain {global_splits[2]}. ')
+            logger.info(f'{self.name.upper()}: Global best split point confirmed, belongs to {global_splits[0]} with gain {global_splits[2]}. ')
+            
             if global_splits[2] < 0:  # 如果分裂增益 < 0 则直接停止分裂
                 stub.ASendMessage(Server_pb2.MessageRequest(json_data="0"))
                 continue
@@ -427,9 +432,11 @@ class ActiveParty:
                 }
             left_node, right_node = spliting_node.split(**param)
             self.split_nodes.extend([left_node, right_node])
+        #告诉被动方建树完毕
+        stub.ASendMessage(Server_pb2.MessageRequest(json_data="2")) #2代表建树完毕
 
     def train_DI(self):
-        pub_key_list.append(self.pub_key)
+        # pub_key_list.append(self.pub_key)
         # self.broadcast_pub_key() 不需要广播公钥
         self.sample_align()
         while self.train_status_DI(): # 树没建完
@@ -448,8 +455,19 @@ class ActiveParty:
             # 向被动方发送梯度信息
             stub=stub_list[0]
             data = msg_gradient_file(self.name, instance_space_file, self.model.grad_file, self.model.hess_file)
-            json_data=json.dumps(data)
-            stub.ASendMessage(Server_pb2.MessageRequest(json_data=json_data))
+
+            #获取存储梯度信息的文件：data['instance_space'],data['grad'],data['hess']
+            file_list=[data['instance_space'],data['grad'],data['hess']]
+            files=[]
+            for file in file_list:
+                with open(file, 'rb') as f:
+                    data = f.read()       
+                files.append(Server_pb2.FileRequest.FileInfo(file=data,name=file,party_name=self.name),)
+            #调用rpc
+            response = stub.ASendFile(Server_pb2.FileRequest(files=files))
+
+            # json_data=json.dumps(data)
+            # stub.ASendMessage(Server_pb2.MessageRequest(json_data=json_data))
 
             logger.info(f'{self.name.upper()}: Gradients broadcasted to all passive parties. ')
 
@@ -461,9 +479,18 @@ class ActiveParty:
             full_grad_sum, full_hess_sum = self.model.grad[instance_space].sum(), self.model.hess[instance_space].sum()
 
             # 收集被动方的梯度信息，并确定最佳分裂点
-            response = stub.AWaitForMessage(Server_pb2.Empty())
-            recv_data = json.loads(response.json_data)['data']
-            logger.info(f'{self.name.upper()}: Received split sum from pp_1. ')
+            response = stub.AGetFile(Server_pb2.Empty())
+            file_info = response.files[0]
+
+            file_data = file_info.file  # 接收到的文件
+            file_name = file_info.name  # 接收到的文件名称
+            file_sender = file_info.party_name
+
+            f = open(file_name, "wb")  # 把传来的文件写入本地磁盘
+            f.write(file_data)  # 写文件
+            f.close()  # 关闭IO
+
+            logger.info(f'{self.name.upper()}: Received split sum from {file_sender}. ')
             passive_best_split = self.passive_best_split_score_DI(recv_data['file_name'], full_grad_sum,
                                                                 full_hess_sum)  # (idx, split_score)
 
@@ -472,7 +499,9 @@ class ActiveParty:
 
 
             logger.info(f'{self.name.upper()}: Global best split point confirmed, belongs to {global_splits[0]} with gain {global_splits[2]}. ')
+
             if global_splits[2] < 0:                    # 如果分裂增益 < 0 则直接停止分裂
+                stub.ASendMessage(Server_pb2.MessageRequest(json_data="0"))
                 continue
             
 

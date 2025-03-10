@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+from msgs.messages import msg_gradient_file
 from protos import Server_pb2
 from protos import Server_pb2_grpc
 
@@ -21,6 +22,8 @@ from core.PassivePartty_SecureBoost import PassiveParty
 from utils.params import pp_list, pp, stub_list, temp_root
 from utils.newUtils import load_dataset, divide_data, vertical_federated_feature_selection, filter_data_by_features, \
     evaluate_model_performance, evaluate_redundancy
+from utils.log import logger
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=False)
@@ -137,20 +140,41 @@ if __name__ == '__main__':
         pp.recv_sample_list(file_name)
 
         while True:
-            #被动方接受主动方的梯度消息
-            response = stub.PWaitForMessage(Server_pb2.Empty())
-            data = json.loads(response.json_data)['data']
-            pp.recv_gradients_DI(data)
+             #被动方接受主动方的梯度消息
+            response = stub.PGetFile(Server_pb2.Empty())
+            files=[]
+            for file_info in response.files:
+                file_data = file_info.file  # 接收到的文件
+                file_name = file_info.name  # 接收到的文件名称
+                file_sender = file_info.party_name
+
+                files.append(file_name)
+
+                f = open(file_name, "wb")  # 把传来的文件写入本地磁盘
+                f.write(file_data)  # 写文件
+                f.close()  # 关闭IO
+            logger.info("recvive gradients from A")
+
+            data = msg_gradient_file(pp.name, files[0], files[1], files[2])
+            pp.recv_gradients(data)
 
             #发送给主动方梯度消息
+            #获取存储分裂信息的文件
             recv_data = pp.get_splits_sum()
-            json_data=json.dumps(recv_data)
-            stub.PSendMessage(Server_pb2.MessageRequest(json_data=json_data))
+            with open(recv_data["file_name"], 'rb') as f:
+                data = f.read()
+
+            files=[]
+            files.append(Server_pb2.FileRequest.FileInfo(file=data,name=recv_data["file_name"],party_name=pp.name),)
+            #调用rpc
+            response = stub.PSendFile(Server_pb2.FileRequest(files=files))
+            logger.info(f'{pp.name.upper()}: Sending splits file to A')
 
             #是否被动方分裂
             response = stub.PWaitForMessage(Server_pb2.Empty())
+            logger.info(f'{pp.name.upper()}: Waiting for Split or not')
             json_data=json.loads(response.json_data)['data']
-            if json_data != '0':#非0代表分裂
+            if json_data != 0:#非0代表分裂
                 recv_data = pp.confirm_split(json_data)  # 被动方将最佳分裂
                 json_data=json.dumps(recv_data)
                 stub.PSendMessage(Server_pb2.MessageRequest(json_data=json_data))

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
+from protos import Server_pb2
 from utils.log import logger
 from core.Calculator import Calculator
 from msgs.messages import msg_empty, msg_name_file, msg_gradient_file, msg_split_confirm, msg_name_space_lookup
@@ -8,7 +9,7 @@ from sklearn.feature_selection import VarianceThreshold, mutual_info_classif, mu
 from sklearn.ensemble import RandomForestClassifier
 from collections import deque
 import os
-from utils.params import temp_root,pp_list
+from utils.params import temp_root,pp_list,stub_list
 import json
 
 
@@ -247,6 +248,10 @@ def evaluate_model_performance(model, client_data, selected_feature_inds, passiv
         return
 
     logger.info(f'Start predicting. ')
+
+    #获取stub
+    stub=stub_list[0]
+
     split_nodes = deque()
     # preds = pd.Series(Calculator.init_pred, index=client_data.index)
 
@@ -282,27 +287,25 @@ def evaluate_model_performance(model, client_data, selected_feature_inds, passiv
                 logger.info(f'{name.upper()}: Splitting on node {spliting_node.id} from {spliting_node.party_name}. ')
                 party_name = spliting_node.party_name
                 look_up_id = spliting_node.look_up_id
-                instance_space_file = os.path.join(temp_root['file'][id], f'instance_space.json')
-                with open(instance_space_file, 'w+') as f:
-                    json.dump(instance_space, f)
 
-                def get_passive_split(party_name: str, instance_space_file: str, look_up_id: int):
-                    pp = passive_port[party_name]
-                    data = msg_name_space_lookup(party_name, instance_space_file, look_up_id)
-                    logger.info(f'{name.upper()}: Sending prediction request to {party_name}. ')
+                recv_data={
+                    "party_name": party_name,
+                    "look_up_id": look_up_id,
+                    "instance_space":instance_space
+                }
+                #向被动方发送查询请求
+                stub.ASendMessage(Server_pb2.MessageRequest(json_data=json.dumps(recv_data)))
 
-                    recv_data = pp.predict(data)
+                #接受被动方的分裂结果
+                response = stub.AWaitForMessage(Server_pb2.Empty())
+                json_data=json.loads(response.json_data)['data']
 
-                    with open(recv_data['file_name'], 'r') as f:
-                        split_space = json.load(f)
-                    left_space, right_space = split_space['left_space'], split_space['right_space']
+                #更新结果
+                spliting_node.left.instance_space = json_data['left_space']
+                spliting_node.right.instance_space = json_data['right_space']
+                split_nodes.extend([spliting_node.left, spliting_node.right])
 
-                    spliting_node.left.instance_space = left_space
-                    spliting_node.right.instance_space = right_space
-
-                    split_nodes.extend([spliting_node.left, spliting_node.right])
-
-                get_passive_split(party_name, instance_space_file, look_up_id)
+                
     logger.info(f'{name.upper()}: Test accuracy: {Calculator.accuracy(selected_data["y"], preds)}. ')
     logger.info(f'{name.upper()}: All finished. ')
     accuracy = Calculator.accuracy(selected_data["y"], preds)

@@ -25,6 +25,18 @@ from utils.newUtils import load_dataset, divide_data, vertical_federated_feature
 
 from msgs.messages import msg_empty, msg_name_file, msg_gradient_file, msg_split_confirm, msg_name_space_lookup
 
+
+#是否继续建立回归树
+def continueBuildTree(epoch: int):
+    response = stub.PWaitForMessage(Server_pb2.Empty()) #不是文件
+    json_data=json.loads(response.json_data)['data']
+    if json_data != 3:#非3代表建树完毕
+        logger.info(f'{pp.name.upper()}: (epoch : {epoch}) End building tree')
+        return False
+    logger.info(f'{pp.name.upper()}: (epoch : {epoch}) Continue building tree')
+    return True
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-n', '--number', dest='passive_num', type=int, default=1)
@@ -137,9 +149,9 @@ if __name__ == '__main__':
             print("服务器返回的数据不是有效的 JSON")
 
         pp.recv_sample_list(file_name)
-
-        while True:
-
+        epoch = 0
+        while continueBuildTree(epoch):
+            epoch += 1
             #被动方接受主动方的梯度消息
             response = stub.PGetFile(Server_pb2.Empty())
             files=[]
@@ -153,7 +165,7 @@ if __name__ == '__main__':
                 f = open(file_name, "wb")  # 把传来的文件写入本地磁盘
                 f.write(file_data)  # 写文件
                 f.close()  # 关闭IO
-            logger.info("recvive gradients from A")
+            logger.info(f"recvive gradients from A : {files}")
 
             #看一下文件名对不对
             data = msg_gradient_file(pp.name, files[0], files[1], files[2])
@@ -179,10 +191,19 @@ if __name__ == '__main__':
 
             #是否被动方分裂
             response = stub.PWaitForMessage(Server_pb2.Empty()) #不是文件
-            logger.info(f'{pp.name.upper()}: Waiting for Split or not')
-            json_data=json.loads(response.json_data)['data']
+            json_data=json.loads(response.json_data)['data']            
+            logger.info(f'{pp.name.upper()}: Waiting for Split or not , result : {json_data}')
             if json_data != 0:#非0代表分裂
                 recv_data = pp.confirm_split(json_data)  # 被动方将最佳分裂
                 json_data=json.dumps(recv_data)
                 stub.PSendMessage(Server_pb2.MessageRequest(json_data=json_data))
+
+        #建树完毕，开始评估
+        while True:
+            # 接受主动方的查询请求 {""party_name": party_name, "look_up_id": look_up_id,"instance_space":instance_space"}
+            response = stub.PWaitForMessage(Server_pb2.Empty())
+            json_data=json.loads(response.json_data)['data']
+
+            #发送查询结果
+            stub.PSendMessage(Server_pb2.MessageRequest(json_data=pp.predict(json_data)))
 

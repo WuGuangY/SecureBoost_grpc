@@ -52,8 +52,6 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
     
     def ComputeHash(self, request, context):
         # 计算SHA-1哈希值
-        print(f'SHA-1!')
-
         train_idx = request.indices
         train_idx_map = {sha1(idx): idx for idx in train_idx}
         
@@ -117,14 +115,12 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
     
     def ASendMessage(self, request, context):
         """客户端 A 发送 JSON 数据"""
-        # print(f"接收到客户端 A 发送的 JSON 数据: {request.json_data}")
         while self.json_data_toP is not None:  # 如果有数据，持续等待
             time.sleep(0.5)  # 每0.5秒检查一次
         # 将 JSON 数据转化为字典
-        logger.info("ASendMessage")
+        logger.info(f"ASendMessage,{request.json_data}")
         try:
             json_obj = json.loads(request.json_data)
-            print(f"解析后的 JSON 对象: {json_obj}")
         except json.JSONDecodeError:
             return Server_pb2.MessageResponse(json_data="无效的 JSON 数据")
         
@@ -135,14 +131,13 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
     
     def PSendMessage(self, request, context):
         """客户端 P 发送 JSON 数据"""
-        # print(f"接收到客户端 P 发送的 JSON 数据: {request.json_data}")
         while self.json_data_toA is not None:  # 如果有数据，持续等待
             time.sleep(0.5)  # 每0.5秒检查一次
         # 将 JSON 数据转化为字典
-        logger.info("PSendMessage")
+        logger.info(f"PSendMessage,{request.json_data}")
+
         try:
             json_obj = json.loads(request.json_data)
-            print(f"解析后的 JSON 对象: {json_obj}")
         except json.JSONDecodeError:
             return Server_pb2.MessageResponse(json_data="无效的 JSON 数据")
         
@@ -154,7 +149,7 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
     def PSendFile(self, request, context):
         while len(self.file_data_toA)!=0:  # 如果有数据，持续等待
             time.sleep(0.5)  # 每0.5秒检查一次
-        logger.info("received file from P")
+        logger.info(f"P send file : {[x.name for x in request.files]}")
         for file_info in request.files:
             file_data = file_info.file  # 接收到的文件
             file_name = file_info.name  # 接收到的文件名称
@@ -170,7 +165,7 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
     def ASendFile(self, request, context):
         while len(self.file_data_toP) != 0:  # 如果有数据，持续等待
             time.sleep(0.5)  # 每0.5秒检查一次
-        logger.info("received file from A")
+        logger.info(f"A send file : {[x.name for x in request.files]}")
         for file_info in request.files:
             file_data = file_info.file  # 接收到的文件
             file_name = file_info.name  # 接收到的文件名称
@@ -202,19 +197,21 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
     
     def PGetFile(self, request, context):
         """客户端 P 等待 文件 数据"""
-        while len(self.file_data_toP) == 0:  # 如果没有数据，持续等待
+        while len(self.file_data_toP) < 3:  # 如果没有数据，持续等待
             time.sleep(1)  # 每0.5秒检查一次
-
-        logger.info("PGetFile")
+  
         #要传输的文件
         files=[]
+        files_name=[]
         
         # 服务器响应客户端的 JSON 数据
         while(len(self.file_data_toP)):
             file_name,file_sender= self.file_data_toP.pop(0)
+            files_name.append(file_name)
             with open(file_name, 'rb') as f:
                 data = f.read()
             files.append(Server_pb2.FileRequest.FileInfo(file=data,name=file_name,party_name=file_sender),)
+        logger.info(f"PGetFile : {files_name}")
         return Server_pb2.FileRequest(files=files)
 
     def AWaitForMessage(self, request, context):
@@ -291,9 +288,6 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
             grad = pd.Series(series_grad)
             hess = pd.Series(series_hess)
 
-            print(f"Received grad")
-            print(f"Received hess")
-
             q_grad, q_hess = BQ_Boost((grad, hess),32, self.pub_key)
             
             # 将新的Pandas Series序列化为JSON字符串
@@ -315,9 +309,6 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
             series_hess = json.loads(request.series_hess)
             grad = pd.Series(series_grad)
             hess = pd.Series(series_hess)
-
-            print(f"Received grad")
-            print(f"Received hess")
 
             q_grad, q_hess, key_list = DI_Boost((grad, hess), 1.5)
             

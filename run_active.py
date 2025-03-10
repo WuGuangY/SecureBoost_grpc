@@ -104,12 +104,11 @@ if __name__ == '__main__':
     ]
     # 服务器的IP地址
     with grpc.insecure_channel('192.168.59.1:50051',options=options) as channel:
-        print("Send Hello")
         stub = Server_pb2_grpc.ServerStub(channel)
         stub_list[0]=stub
         
-        # ap.train()
-        ap.train_DI()
+        ap.train()
+        # ap.train_DI()
         file_name = ap.dump_model('./static/model/')
         ap.load_model(file_name)
         evaluate_model_performance(ap.model, ap.testset, selected_features, ap.passive_port)    # 集成了predict

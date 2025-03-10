@@ -372,14 +372,11 @@ class PassiveParty:
         """
         根据主动方传来的样本空间、查找表条目将样本空间分割成左右部分返回
         """
-        party_name = recv_dict['party_name']
-        instance_space_file = recv_dict['instance_space']
+        # party_name = recv_dict['party_name']
+        instance_space = recv_dict['instance_space']
         look_up_id = int(recv_dict['look_up_id'])
 
-        assert party_name == self.name, logger.error(f'Incorrect party name: \'{party_name}\'. ')
-
-        with open(instance_space_file, 'r') as f:
-            instance_space = json.load(f)
+        # assert party_name == self.name, logger.error(f'Incorrect party name: \'{party_name}\'. ')
 
         logger.info(f'{self.name.upper()}: Predicting on {len(instance_space)} samples. ')
         look_up_entry = self.look_up_table.iloc[look_up_id]
@@ -389,9 +386,9 @@ class PassiveParty:
         left_space = left_space[left_space].index.tolist()
         right_space = [idx for idx in instance_space if idx not in left_space]
 
-        split_space_file = os.path.join(temp_root['file'][self.id], f'split_space.json')
-        with open(split_space_file, 'w+') as f:
-            json.dump({'left_space': left_space, 'right_space': right_space}, f)
+        # split_space_file = os.path.join(temp_root['file'][self.id], f'split_space.json')
+        # with open(split_space_file, 'w+') as f:
+        #     json.dump({'left_space': left_space, 'right_space': right_space}, f)
         
-        return msg_name_file(self.name, split_space_file)
+        return  json.dumps({'left_space': left_space, 'right_space': right_space})
     
