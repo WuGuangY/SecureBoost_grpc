@@ -1,0 +1,6 @@
+grpcio == 1.70.0
+numpy
+pandas
+protobuf == 5.29.3
+scikit-learn
+phe
