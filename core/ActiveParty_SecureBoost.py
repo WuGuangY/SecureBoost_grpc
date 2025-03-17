@@ -316,8 +316,8 @@ class ActiveParty:
             left_hess_sum=i2f(left_hess_sum)
 
             key_list=self.model.keylist
-            left_grad_sum=left_grad_sum/key_list[0][2]*key_list[0][1]-key_list[0][0]*left_num
-            left_hess_sum=left_hess_sum/key_list[0][3]
+            left_grad_sum=left_grad_sum/key_list[2]*key_list[1]-key_list[0]*left_num
+            left_hess_sum=left_hess_sum/key_list[3]
 
             split_score = Calculator.split_score_passive(left_grad_sum, left_hess_sum, full_grad_sum, full_hess_sum)
             if not local_best_split or split_score > local_best_split[1]:
@@ -423,8 +423,9 @@ class ActiveParty:
                 logger.debug(f'Received confirm data, look up index: {look_up_id}. ')
 
                 # 获得分裂后的左空间
-                with open(recv_data['left_space'], 'r') as f:
-                    left_space = json.load(f)
+                left_space = recv_data['left_space']
+                # with open(recv_data['left_space'], 'r') as f:
+                #     left_space = json.load(f)
                 param = {
                     'party_name': global_splits[0],
                     'left_space': left_space,
@@ -496,7 +497,7 @@ class ActiveParty:
             f.close()  # 关闭IO
 
             logger.info(f'{self.name.upper()}: Received split sum from {file_sender}. ')
-            passive_best_split = self.passive_best_split_score_DI(recv_data['file_name'], full_grad_sum,
+            passive_best_split = self.passive_best_split_score_DI(file_name, full_grad_sum,
                                                                 full_hess_sum)  # (idx, split_score)
 
             if passive_best_split[1] > global_splits[2]:
@@ -533,8 +534,9 @@ class ActiveParty:
                 logger.debug(f'Received confirm data, look up index: {look_up_id}. ')
 
                 # 获得分裂后的左空间
-                with open(recv_data['left_space'], 'r') as f:
-                    left_space = json.load(f)
+                left_space = recv_data['left_space']
+                # with open(recv_data['left_space'], 'r') as f:
+                #     left_space = json.load(f)
                 param = {
                     'party_name': global_splits[0],
                     'left_space': left_space,

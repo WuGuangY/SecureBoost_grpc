@@ -112,6 +112,12 @@ if __name__ == '__main__':
         ('grpc.max_receive_message_length', 100 * 1024 * 1024),  # 接收消息的最大大小
         ('grpc.max_send_message_length', 100 * 1024 * 1024)     # 发送消息的最大大小
     ]
+
+    pathList = ["temp\\file\\party-0","temp\\file\\party-"]
+    for path in pathList:
+        if not os.path.exists(path):
+            os.makedirs(path)
+            
     # 服务器的IP地址
     with grpc.insecure_channel(url+':'+ str(port),options=options) as channel:
         stub = Server_pb2_grpc.ServerStub(channel)
