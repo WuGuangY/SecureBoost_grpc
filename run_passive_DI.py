@@ -127,7 +127,7 @@ if __name__ == '__main__':
         ('grpc.max_send_message_length', 100 * 1024 * 1024)     # 发送消息的最大大小
     ]
 
-    pathList = ["temp\\file\\party-0","temp\\file\\party-"]
+    pathList = ["temp\\file\\party-0","temp\\file\\party-1"]
     for path in pathList:
         if not os.path.exists(path):
             os.makedirs(path)
@@ -197,7 +197,7 @@ if __name__ == '__main__':
             #是否被动方分裂
             response = stub.PWaitForMessage(Server_pb2.Empty())
             json_data=json.loads(response.json_data)['data']
-            logger.info(f'{pp.name.upper()}: Waiting for Split or not , result : {json_data}')
+            logger.info(f'{pp.name.upper()}: Waiting for Split or not ')
             if json_data != 0:#非0代表分裂
                 recv_data = pp.confirm_split(json_data)  # 被动方将最佳分裂
                 json_data=json.dumps(recv_data)

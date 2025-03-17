@@ -113,7 +113,7 @@ if __name__ == '__main__':
         ('grpc.max_send_message_length', 100 * 1024 * 1024)     # 发送消息的最大大小
     ]
 
-    pathList = ["temp\\file\\party-0","temp\\file\\party-"]
+    pathList = ["temp\\file\\party-0","temp\\file\\party-1"]
     for path in pathList:
         if not os.path.exists(path):
             os.makedirs(path)

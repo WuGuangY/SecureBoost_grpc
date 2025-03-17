@@ -118,7 +118,7 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
         while self.json_data_toP is not None:  # 如果有数据，持续等待
             time.sleep(0.5)  # 每0.5秒检查一次
         # 将 JSON 数据转化为字典
-        logger.info(f"ASendMessage,{request.json_data}")
+        logger.info(f"ASendMessage")
         try:
             json_obj = json.loads(request.json_data)
         except json.JSONDecodeError:
@@ -134,7 +134,7 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
         while self.json_data_toA is not None:  # 如果有数据，持续等待
             time.sleep(0.5)  # 每0.5秒检查一次
         # 将 JSON 数据转化为字典
-        logger.info(f"PSendMessage,{request.json_data}")
+        logger.info(f"PSendMessage")
 
         try:
             json_obj = json.loads(request.json_data)
@@ -329,8 +329,8 @@ class ServerServicer(Server_pb2_grpc.ServerServicer):
 def serve():
     # 设置最大消息大小为 100MB（100 * 1024 * 1024）
     options = [
-        ('grpc.max_receive_message_length', 100 * 1024 * 1024),  # 接收消息的最大大小
-        ('grpc.max_send_message_length', 100 * 1024 * 1024)     # 发送消息的最大大小
+        ('grpc.max_receive_message_length', 1000 * 1024 * 1024),  # 接收消息的最大大小
+        ('grpc.max_send_message_length', 1000 * 1024 * 1024)     # 发送消息的最大大小
     ]
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10), options=options)
     Server_pb2_grpc.add_ServerServicer_to_server(ServerServicer(), server)
