@@ -4,3 +4,4 @@ pandas
 protobuf == 5.29.3
 scikit-learn
 phe
+yaml 6.0.2

@@ -25,6 +25,15 @@ from utils.newUtils import load_dataset, divide_data, vertical_federated_feature
     evaluate_model_performance, evaluate_redundancy
 from utils.log import logger
 
+#是否继续建立回归树
+def continueBuildTree(epoch: int):
+    response = stub.PWaitForMessage(Server_pb2.Empty()) #不是文件
+    json_data=json.loads(response.json_data)['data']
+    if json_data != 3:#非3代表建树完毕
+        logger.info(f'{pp.name.upper()}: (epoch : {epoch}) End building tree')
+        return False
+    logger.info(f'{pp.name.upper()}: (epoch : {epoch}) Continue building tree')
+    return True
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=False)
@@ -120,7 +129,6 @@ if __name__ == '__main__':
 
     # 服务器的IP地址
     with grpc.insecure_channel(url+':'+ str(port),options=options) as channel:
-        print("Send Hello")
         stub = Server_pb2_grpc.ServerStub(channel)
         stub_list[1]=stub
 
@@ -149,7 +157,7 @@ if __name__ == '__main__':
 
         pp.recv_sample_list(file_name)
         epoch = 0
-        while True:
+        while continueBuildTree(epoch):
             epoch += 1
             #被动方接受主动方的梯度消息
             response = stub.PGetFile(Server_pb2.Empty())
@@ -167,7 +175,7 @@ if __name__ == '__main__':
             logger.info("recvive gradients from A")
 
             data = msg_gradient_file(pp.name, files[0], files[1], files[2])
-            pp.recv_gradients(data)
+            pp.recv_gradients_DI(data)
 
             #发送给主动方梯度消息
             #获取存储分裂信息的文件
@@ -189,7 +197,7 @@ if __name__ == '__main__':
                 recv_data = pp.confirm_split(json_data)  # 被动方将最佳分裂
                 json_data=json.dumps(recv_data)
                 stub.PSendMessage(Server_pb2.MessageRequest(json_data=json_data))
-                
+     
         #建树完毕，开始评估
         while True:
             # 接受主动方的查询请求 {""party_name": party_name, "look_up_id": look_up_id,"instance_space":instance_space"}

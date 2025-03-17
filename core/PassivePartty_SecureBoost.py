@@ -366,7 +366,7 @@ class PassiveParty:
 
         logger.info(f'{self.name.upper()}: Confirmation received, update look up table on index: {look_up_index}. ')
         
-        return msg_split_confirm(self.name, int(look_up_index), left_space_file)
+        return msg_split_confirm(self.name, int(look_up_index), best_split[2])
 
     def predict(self, recv_dict: dict):
         """
