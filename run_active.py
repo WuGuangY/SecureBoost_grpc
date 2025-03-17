@@ -37,12 +37,12 @@ if __name__ == '__main__':
 
     port = stub_params.get('port') #cconfig.get('params')['stub']['port']
     url = stub_params.get('url')
+    datasetFile = stub_params.get('datasetFilePath')
 
     #####################################################################################################################################################
 
     # raw_data, feature_names, sample_indices = load_dataset("D:/Projects/Python_projects/SecureBoostImpl-main(2)/static/data/train_origin.csv")
-    raw_data, feature_names, sample_indices = load_dataset(
-        "./static/data/train_first_5000.csv")
+    raw_data, feature_names, sample_indices = load_dataset(datasetFile)
     # raw_data, feature_names, sample_indices = load_dataset('f./static/data/train_origin.csv')
     # 输出 raw_data、feature_names、sample_indices 的尺寸和类型
     last_column = raw_data[:, -1]  # 提取最后一列
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     for path in pathList:
         if not os.path.exists(path):
             os.makedirs(path)
-            
+
     # 服务器的IP地址
     with grpc.insecure_channel(url+':'+ str(port),options=options) as channel:
         stub = Server_pb2_grpc.ServerStub(channel)
