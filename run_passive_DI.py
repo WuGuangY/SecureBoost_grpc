@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import yaml
 
 from msgs.messages import msg_gradient_file
 from protos import Server_pb2
@@ -30,6 +31,15 @@ if __name__ == '__main__':
     parser.add_argument('-n', '--number', dest='passive_num', type=int, default=1)
     args = parser.parse_args()
 
+    
+    #读取yaml
+    with open('config/config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    stub_params = config.get('params', {}).get('stub', {})
+
+    port = stub_params.get('port') #cconfig.get('params')['stub']['port']
+    url = stub_params.get('url')
     #####################################################################################################################################################
 
     # raw_data, feature_names, sample_indices = load_dataset("D:/Projects/Python_projects/SecureBoostImpl-main(2)/static/data/train_origin.csv")
@@ -109,7 +119,7 @@ if __name__ == '__main__':
     ]
 
     # 服务器的IP地址
-    with grpc.insecure_channel('192.168.31.209:50051',options=options) as channel:
+    with grpc.insecure_channel(url+':'+ str(port),options=options) as channel:
         print("Send Hello")
         stub = Server_pb2_grpc.ServerStub(channel)
         stub_list[1]=stub
@@ -133,14 +143,15 @@ if __name__ == '__main__':
             #写入文件sample_align.json
             file_name = os.path.join(temp_root['file'][pp.id], f'sample_align.json')
             with open(file_name, 'w+') as f:
-                json.dump(json_data, f)
+                json.dump(hash_data['data'], f)
         except json.JSONDecodeError:
             print("服务器返回的数据不是有效的 JSON")
 
         pp.recv_sample_list(file_name)
-
+        epoch = 0
         while True:
-             #被动方接受主动方的梯度消息
+            epoch += 1
+            #被动方接受主动方的梯度消息
             response = stub.PGetFile(Server_pb2.Empty())
             files=[]
             for file_info in response.files:
@@ -172,12 +183,20 @@ if __name__ == '__main__':
 
             #是否被动方分裂
             response = stub.PWaitForMessage(Server_pb2.Empty())
-            logger.info(f'{pp.name.upper()}: Waiting for Split or not')
             json_data=json.loads(response.json_data)['data']
+            logger.info(f'{pp.name.upper()}: Waiting for Split or not , result : {json_data}')
             if json_data != 0:#非0代表分裂
                 recv_data = pp.confirm_split(json_data)  # 被动方将最佳分裂
                 json_data=json.dumps(recv_data)
                 stub.PSendMessage(Server_pb2.MessageRequest(json_data=json_data))
+                
+        #建树完毕，开始评估
+        while True:
+            # 接受主动方的查询请求 {""party_name": party_name, "look_up_id": look_up_id,"instance_space":instance_space"}
+            response = stub.PWaitForMessage(Server_pb2.Empty())
+            json_data=json.loads(response.json_data)['data']
 
+            #发送查询结果
+            stub.PSendMessage(Server_pb2.MessageRequest(json_data=pp.predict(json_data)))
             
                 

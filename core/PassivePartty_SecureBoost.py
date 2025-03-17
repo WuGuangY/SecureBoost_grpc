@@ -297,7 +297,7 @@ class PassiveParty:
             instance_space = json.load(f)
         grad = pd.read_pickle(recv_dict['grad'])
         hess = pd.read_pickle(recv_dict['hess'])  
-
+        
         # 对梯度和海森矩阵进行解密
         grad = grad.apply(i2f)
         hess = hess.apply(i2f)

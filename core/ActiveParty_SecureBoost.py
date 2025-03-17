@@ -16,7 +16,7 @@ from core.BQ_Boost import BQ_Boost
 from core.DI_Boost import DI_Boost,f2i,i2f
 from core.Calculator import Calculator
 from utils.log import logger
-from utils.params import temp_root, pp_list, pub_key_list, key_list, stub_list
+from utils.params import temp_root, pp_list, pub_key_list,  stub_list
 from utils.encryption import serialize_pub_key, serialize_encrypted_number, load_encrypted_number
 from utils.decorators import broadcast, use_thread, poll
 from msgs.messages import msg_empty, msg_name_file, msg_gradient_file, msg_split_confirm, msg_name_space_lookup
@@ -315,7 +315,7 @@ class ActiveParty:
             left_grad_sum=i2f(left_grad_sum)
             left_hess_sum=i2f(left_hess_sum)
 
-            # key_list=self.keylist
+            key_list=self.model.keylist
             left_grad_sum=left_grad_sum/key_list[0][2]*key_list[0][1]-key_list[0][0]*left_num
             left_hess_sum=left_hess_sum/key_list[0][3]
 
@@ -440,11 +440,16 @@ class ActiveParty:
         # self.broadcast_pub_key() 不需要广播公钥
         self.sample_align()
         while self.train_status_DI(): # 树没建完
+            stub=stub_list[0]
+
             spliting_node = self.split_nodes.popleft()
             # 检查叶子节点能否继续分裂（到达深度 / 样本过少都会停止分裂）
             if not spliting_node.splitable():
                 continue
             logger.info(f'{self.name.upper()}: Splitting node {spliting_node.id}. ')
+
+            #告诉被动方继续建树
+            stub.ASendMessage(Server_pb2.MessageRequest(json_data="3")) #3代表继续建树
 
             # 准备好本节点训练所用的文件
             instance_space_file = os.path.join(temp_root['file'][self.id], f'instance_space.json')
@@ -452,8 +457,7 @@ class ActiveParty:
             with open(instance_space_file, 'w+') as f:
                 json.dump(instance_space, f)
 
-            # 向被动方发送梯度信息
-            stub=stub_list[0]
+            # 向被动方发送梯度信息           
             data = msg_gradient_file(self.name, instance_space_file, self.model.grad_file, self.model.hess_file)
 
             #获取存储梯度信息的文件：data['instance_space'],data['grad'],data['hess']
@@ -480,6 +484,7 @@ class ActiveParty:
 
             # 收集被动方的梯度信息，并确定最佳分裂点
             response = stub.AGetFile(Server_pb2.Empty())
+
             file_info = response.files[0]
 
             file_data = file_info.file  # 接收到的文件
@@ -537,6 +542,9 @@ class ActiveParty:
                 }
             left_node, right_node = spliting_node.split(**param)
             self.split_nodes.extend([left_node, right_node])
+
+        #告诉被动方建树完毕
+        stub.ASendMessage(Server_pb2.MessageRequest(json_data="2")) #2代表建树完毕
 
     def dump_model(self, file_path: str):
         """
@@ -702,8 +710,9 @@ class Model:
         # 反序列化接收到的JSON字符串为Pandas Series
         self.grad_enc = pd.Series(json.loads(response.series_grad))
         self.hess_enc = pd.Series(json.loads(response.series_hess))
+
         self.keylist = json.loads(response.key_list)
-        key_list[0]=json.loads(response.key_list)
+        # key_list[0]=json.loads(response.key_list)
 
         self.grad_enc.to_pickle(self.grad_file)
         self.hess_enc.to_pickle(self.hess_file)    

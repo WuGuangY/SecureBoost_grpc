@@ -8,6 +8,7 @@ import grpc
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
+import yaml
 
 from core.Calculator import Calculator
 from core.ActiveParty_SecureBoost import ActiveParty
@@ -27,6 +28,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-n', '--number', dest='passive_num', type=int, default=1)
     args = parser.parse_args()
+
+    #读取yaml
+    with open('config/config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    stub_params = config.get('params', {}).get('stub', {})
+
+    port = stub_params.get('port') #cconfig.get('params')['stub']['port']
+    url = stub_params.get('url')
 
     #####################################################################################################################################################
 
@@ -104,7 +114,7 @@ if __name__ == '__main__':
     ]
 
     # 服务器的IP地址
-    with grpc.insecure_channel('192.168.31.209:50051',options=options) as channel:
+    with grpc.insecure_channel(url+':'+ str(port),options=options) as channel:
         print("Send Hello")
         stub = Server_pb2_grpc.ServerStub(channel)
         stub_list[0]=stub
